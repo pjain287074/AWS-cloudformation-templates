@@ -1,170 +1,91 @@
 AWSTemplateFormatVersion: 2010-09-09
 Parameters:
-  InstanceTypeParameter:
+  MyVpcStackName:
+    Description: Name of the base stack with all infra resources
     Type: String
-    Default: t3a.medium
-    Description: Enter instance size. Default is t3a.medium.
-  WorkstationIp:
+    Default: vpc
+  # LatestAmiId:
+  #   Type: String
+  #   Default: 'ami-0b0ea68c435eb488d'
+  LatestAmiId:
+    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+    Default: '/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2'
+
+  SSHLocation:
+    Description: The IP address range that can be used to SSH to the EC2 instances
     Type: String
-    Description: The IP address of the workstation that can RDP into the instance.
-  AMI:
+    MinLength: 9
+    MaxLength: 18
+    Default: 0.0.0.0/0
+    AllowedPattern: (\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+  EnvironmentName:
+    Description: An environment name that is prefixed to resource names
     Type: String
-    Default: ami-05bb2dae0b1de90b3
-    Description: The Windows AMI to use.
-  Key:
+    Default: dev
+  InstanceType:
+    Description: WebServer EC2 instance type
     Type: String
-    Description: The key used to access the instance.
+    Default: t3.micro
+    AllowedValues: [t2.nano, t2.micro, t2.small, t2.medium, t2.large, t2.xlarge, t2.2xlarge,
+      t3.nano, t3.micro, t3.small, t3.medium, t3.large, t3.xlarge, t3.2xlarge,
+      m4.large, m4.xlarge, m4.2xlarge, m4.4xlarge, m4.10xlarge,
+      m5.large, m5.xlarge, m5.2xlarge, m5.4xlarge,
+      c5.large, c5.xlarge, c5.2xlarge, c5.4xlarge, c5.9xlarge,
+      g3.8xlarge,
+      r5.large, r5.xlarge, r5.2xlarge, r5.4xlarge, r3.12xlarge,
+      i3.xlarge, i3.2xlarge, i3.4xlarge, i3.8xlarge,
+      d2.xlarge, d2.2xlarge, d2.4xlarge, d2.8xlarge]
+    ConstraintDescription: must be a valid EC2 instance type.
+  KeyName:
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the instance
+    Type: AWS::EC2::KeyPair::KeyName
+    Default: test
+    ConstraintDescription: must be the name of an existing EC2 KeyPair
+
 Resources:
-  VPC:
-    Type: AWS::EC2::VPC
-    Properties:
-      CidrBlock: 10.0.0.0/16
-      EnableDnsSupport: true
-      EnableDnsHostnames: true
-      InstanceTenancy: default
-      Tags:
-        - Key: Name
-          Value: Windows Target VPC
-  InternetGateway:
-    Type: AWS::EC2::InternetGateway
-  VPCGatewayAttachment:
-    Type: AWS::EC2::VPCGatewayAttachment
-    Properties:
-      VpcId: !Ref VPC
-      InternetGatewayId: !Ref InternetGateway
-  SubnetA:
-    Type: AWS::EC2::Subnet
-    Properties:
-      AvailabilityZone: us-east-1a
-      VpcId: !Ref VPC
-      CidrBlock: 10.0.0.0/24
-      MapPublicIpOnLaunch: true
-  RouteTable:
-    Type: AWS::EC2::RouteTable
-    Properties:
-      VpcId: !Ref VPC
-  InternetRoute:
-    Type: AWS::EC2::Route
-    DependsOn: InternetGateway
-    Properties:
-      DestinationCidrBlock: 0.0.0.0/0
-      GatewayId: !Ref InternetGateway
-      RouteTableId: !Ref RouteTable
-  SubnetARouteTableAssociation:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      RouteTableId: !Ref RouteTable
-      SubnetId: !Ref SubnetA
   InstanceSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupName: "Octopus Target Group"
-      GroupDescription: "Tentacle traffic in from hosted static ips, and RDP in from a personal workstation"
-      VpcId: !Ref VPC
+      GroupDescription: Enable SSH access via port 22
       SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: '10933'
-          ToPort: '10933'
-          CidrIp:  20.188.245.156/32
-        - IpProtocol: tcp
-          FromPort: '10933'
-          ToPort: '10933'
-          CidrIp:  52.147.25.42/32 
-        - IpProtocol: tcp
-          FromPort: '10933'
-          ToPort: '10933'
-          CidrIp:  52.147.31.180/32 
-        - IpProtocol: tcp
-          FromPort: '10933'
-          ToPort: '10933'
-          CidrIp:  20.188.244.132/32 
-        - IpProtocol: tcp
-          FromPort: '10933'
-          ToPort: '10933'
-          CidrIp:  52.147.25.94/32 
-        - IpProtocol: tcp
-          FromPort: '10933'
-          ToPort: '10933'
-          CidrIp:  52.147.25.173/32 
-        - IpProtocol: tcp
-          FromPort: '10933'
-          ToPort: '10933'
-          CidrIp:  20.188.245.171/32 
-        - IpProtocol: tcp
-          FromPort: '10933'
-          ToPort: '10933'
-          CidrIp:  20.188.245.7/32
-        - IpProtocol: tcp
-          FromPort: '10933'
-          ToPort: '10933'
-          CidrIp:  20.188.244.147/32
-        - IpProtocol: tcp
-          FromPort: '10933'
-          ToPort: '10933'
-          CidrIp:  20.188.244.240/32
-        - IpProtocol: tcp
-          FromPort: '3389'
-          ToPort: '3389'
-          CidrIp:  !Sub ${WorkstationIp}/32
-      SecurityGroupEgress:
-        - IpProtocol: -1
-          CidrIp: 0.0.0.0/0
-  ElasticIP:
-    Type: AWS::EC2::EIP
-    Properties:
-      Domain: vpc
-      InstanceId: !Ref Windows
-  Windows:
-    Type: 'AWS::EC2::Instance'
-    Properties:
-      ImageId: !Ref AMI
-      InstanceType:
-        Ref: InstanceTypeParameter
-      KeyName: !Ref Key
-      SubnetId: !Ref SubnetA
-      SecurityGroupIds:
-        - Ref: InstanceSecurityGroup
-      BlockDeviceMappings:
-        - DeviceName: /dev/sda1
-          Ebs:
-            VolumeSize: 250
-      UserData:
-        Fn::Base64: !Sub |
-          <powershell>
-          Write-Host "Hello World!"
-          </powershell>
+      - IpProtocol: tcp
+        FromPort: 22
+        ToPort: 22
+        CidrIp: !Ref 'SSHLocation'
+      - IpProtocol: tcp
+        FromPort: 80
+        ToPort: 80
+        CidrIp: !Ref 'SSHLocation'
       Tags:
-        -
-          Key: Appplication
-          Value:  Windows Server
-        -
-          Key: Domain
-          Value: None
-        -
-          Key: Environment
-          Value: Test
-        -
-          Key: LifeTime
-          Value: Transient
-        -
-          Key: Name
-          Value:  Windows Server Worker
-        -
-          Key: OS
-          Value: Windows
-        -
-          Key: OwnerContact
-          Value: "@matthewcasperson"
-        -
-          Key: Purpose
-          Value: MattC Test Worker
-        -
-          Key: Source
-          Value: CloudFormation Script in Octopus Deploy
-Outputs:
-  PublicIp:
-    Value:
-      Fn::GetAtt:
-        - Windows
-        - PublicIp
-    Description: Server's PublicIp Address
+        - Key: Name
+          Value: !Join ['-',[!Sub '${AWS::StackName}', !Ref 'AWS::Region', !Ref EnvironmentName, SecurityGroup]]
+      VpcId: 
+        Fn::ImportValue:
+          Fn::Sub: "${MyVpcStackName}-VPCID"    
+          
+  MyEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref LatestAmiId
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      Tags:
+        - Key: Name
+          Value: Simple Server
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: "true"
+          DeviceIndex: "0"
+          GroupSet:
+            - Ref: InstanceSecurityGroup
+          SubnetId:
+            Fn::ImportValue:
+              Fn::Sub: "${MyVpcStackName}-PublicSubnetID" 
+      UserData:
+        Fn::Base64:
+          !Sub |
+            #!/bin/bash -xe
+            yum -y update
+            sudo yum install -y httpd
+            sudo systemctl start httpd
+            sudo echo '<h1>Hello from ${AWS::Region}</h1>' > /var/www/html/index.html

@@ -163,3 +163,29 @@ Outputs:
   PrivateSubnets:
     Description: A list of the private subnets
     Value: !Join [ ",", [ !Ref PrivateSubnet, !Ref PrivateSubnet1 ]]
+
+
+Outputs:
+  VPCID:
+      Description: VPC ID
+      Value:
+        Ref: VPC
+      Export:
+        Name:
+          Fn::Sub: "${AWS::StackName}-VPCID"
+    
+  PublicSubnet:
+    Description: The subnet ID to use for public web servers
+    Value:
+      Ref: PublicSubnet
+    Export:
+      Name:
+        Fn::Sub: "${AWS::StackName}-PublicSubnetID"
+
+  PrivateSubnet:
+    Description: The subnet ID to use for public web servers
+    Value:
+      Ref: PrivateSubnet
+    Export:
+      Name:
+        Fn::Sub: "${AWS::StackName}-PrivateSubnetID"
